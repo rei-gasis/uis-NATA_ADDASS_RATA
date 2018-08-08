@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dataTemplate name="XXUPNATA_ADDASS_RATA" description="UP HR Notification of Approval of Temporary Appointment on Additional Assignment with RATA" defaultPackage="" Version="1.0">
+
+<parameters>
+	<parameter name="P_DATE_REQUESTED" dataType="date"/>   
+	<parameter name="P_LEGAL_EMPLOYER" dataType="number"/>   
+	<parameter name="P_PERSON_ID" dataType="number"/>
+	<parameter name="P_EMPLOYEE_ASSIGNMENT_ID" dataType="number"/>
+	<parameter name="P_SIGNATORY_PERSON_ID" dataType="number"/>
+	<parameter name="P_SIGNATORY_ASSIGNMENT_ID" dataType="number"/>
+	<parameter name="P_START_DATE" dataType="date"/>
+	<parameter name="P_END_DATE" dataType="date"/>
+	<parameter name="P_INPUT_1" dataType="character"/>
+	
+</parameters>
+
+<dataQuery>
+
+<sqlStatement name="Q_LEGAL_ENT">
+<![CDATA[
+select UPPER(SUBSTR(org.name, 4)) as CU
+	  ,SUBSTR(org.name, 4) as CU_Proper
+		 from hr_organization_units org where org.organization_id = :P_LEGAL_EMPLOYER
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_LOCATION_ADD">
+<![CDATA[
+
+select loc.ADDRESS_LINE_1||', '|| loc.TOWN_OR_CITY as LOCATION_ADD
+		from hr_locations_all loc
+		where
+                loc.SHIP_TO_SITE_FLAG = 'Y'
+   		and loc.location_id = (select org.location_id from 
+		hr_all_organization_units org where org.organization_id = :P_LEGAL_EMPLOYER)
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_SEQUENCE">
+<![CDATA[
+   SELECT LPAD(TO_CHAR(xxup_seq_nata_addass_rata.NEXTVAL),9,'0') as seq FROM DUAL
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_EMP_FULL_NAME">
+<![CDATA[
+
+SELECT TRIM((SELECT fnd.meaning
+              FROM FND_LOOKUP_VALUES fnd
+              WHERE fnd.LOOKUP_CODE = ppf.TITLE
+              AND fnd.LOOKUP_TYPE = 'UP_HR_TITLE') || ' ' ||
+        INITCAP(ppf.first_name||' '||SUBSTR(ppf.middle_names,1,1)||'. '||ppf.last_name||' '||ppf.suffix)) EMP_FULL_NAME
+FROM per_people_f ppf
+WHERE :P_START_DATE between ppf.effective_start_date and ppf.effective_end_date
+AND ppf.person_id = :P_PERSON_ID
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_UNIT_NAME">
+<![CDATA[
+
+select substr(substr(PALD.POSITION,instr(PALD.POSITION,'.',1,1)+1,(instr(PALD.POSITION,'.',1,2)-1)-(instr(PALD.POSITION,'.',1,1)-1)-1),
+                instr(substr(PALD.POSITION,instr(PALD.POSITION,'.',1,1)+1,(instr(PALD.POSITION,'.',1,2)-1)-(instr(PALD.POSITION,'.',1,1)-1)-1), ' ',1,1)+1,
+                instr(substr(PALD.POSITION,instr(PALD.POSITION,'.',1,1)+1,(instr(PALD.POSITION,'.',1,2)-1)-(instr(PALD.POSITION,'.',1,1)-1)), '.',1,1)
+               ) AS EMP_ORG
+               from PER_ALL_ASSIGNMENTS_D PALD, PER_ALL_ASSIGNMENTS_F PALF
+               where PALD.ASSIGNMENT_ID = PALF.ASSIGNMENT_ID
+               and PALF.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+               and :P_START_DATE BETWEEN PALD.EFFECTIVE_START_DATE AND PALD.EFFECTIVE_END_DATE
+               and :P_START_DATE BETWEEN PALF.EFFECTIVE_START_DATE and PALF.EFFECTIVE_END_DATE
+			   AND rownum = 1
+
+			   
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_CU">
+<![CDATA[
+
+select INITCAP(SUBSTR(org.name, 4)) as BRANCH from hr_organization_units org where org.organization_id = :P_LEGAL_EMPLOYER
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_DESIGNATION">
+<![CDATA[
+
+select substr(PALD.POSITION,1,instr(PALD.POSITION,'.')-1) EMP_POS
+    from PER_ALL_ASSIGNMENTS_D PALD, PER_ALL_ASSIGNMENTS_F PALF
+               where PALD.ASSIGNMENT_ID = PALF.ASSIGNMENT_ID
+               and PALF.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+               and :P_START_DATE BETWEEN PALD.EFFECTIVE_START_DATE AND PALD.EFFECTIVE_END_DATE
+               and :P_START_DATE BETWEEN PALF.EFFECTIVE_START_DATE and PALF.EFFECTIVE_END_DATE
+			   AND rownum = 1
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_GRADE_STEP">
+<![CDATA[
+	SELECT to_char(pg.name) || '-' || to_char(psps.sequence) SG
+	FROM hr.per_all_assignments_f paaf
+	   ,hr.per_all_people_f papf
+	   ,per_spinal_point_placements_f pspp
+	   ,per_spinal_point_steps_f psps
+	   ,per_grades pg
+	WHERE paaf.person_id = papf.person_id
+	  AND :P_START_DATE BETWEEN papf.effective_start_date AND papf.effective_end_date
+	  AND :P_START_DATE BETWEEN paaf.effective_start_date AND paaf.effective_end_date
+	  AND paaf.grade_id = pg.grade_id 
+	  AND pspp.assignment_id = paaf.assignment_id
+	  AND psps.step_id = pspp.step_id
+	  AND paaf.assignment_id = :P_EMPLOYEE_ASSIGNMENT_ID
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_HON_IN_WORDS">
+<![CDATA[
+
+SELECT INITCAP(TO_CHAR(TO_DATE(paaf.ass_attribute5, 'j'), 'jsp')) as HON_IN_WORDS
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = (select pald.assignment_id from PER_ALL_ASSIGNMENTS_D pald
+where pald.assignment_id = :P_EMPLOYEE_ASSIGNMENT_ID and :P_START_DATE between pald.effective_start_date and pald.effective_end_date)
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_HON_IN_NUMBERS">
+<![CDATA[
+
+select paaf.ass_attribute5 as HON_IN_NUMBERS 
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = (select pald.assignment_id from PER_ALL_ASSIGNMENTS_D pald
+where pald.assignment_id = :P_EMPLOYEE_ASSIGNMENT_ID and :P_START_DATE between pald.effective_start_date and pald.effective_end_date)
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_RA_IN_WORDS">
+<![CDATA[
+
+SELECT INITCAP(TO_CHAR(TO_DATE(paaf.ass_attribute6, 'j'), 'jsp')) as RA_IN_WORDS
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_RA_IN_NUMBERS">
+<![CDATA[
+
+select paaf.ass_attribute6 as RA_IN_NUMBERS
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_TA_IN_WORDS">
+<![CDATA[
+
+SELECT INITCAP(TO_CHAR(TO_DATE(paaf.ass_attribute7, 'j'), 'jsp')) as TA_IN_WORDS
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_TA_IN_NUMBERS">
+<![CDATA[
+
+select paaf.ass_attribute7 as TA_IN_NUMBERS
+from PER_ALL_ASSIGNMENTS_F paaf
+where paaf.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+and business_group_id = 81
+and :P_START_DATE between paaf.EFFECTIVE_START_DATE and paaf.EFFECTIVE_END_DATE
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_ADMIN_LOAD_CREDIT">
+<![CDATA[
+
+select paef.aei_information1 as ADMINLOADCREDIT from per_assignment_extra_info paef
+where paef.ASSIGNMENT_ID = :P_EMPLOYEE_ASSIGNMENT_ID
+and rownum = 1
+
+]]>
+</sqlStatement>
+
+
+<sqlStatement name="Q_DATE_REQUESTED">
+<![CDATA[
+   SELECT 
+		 TO_CHAR(:P_START_DATE,'DD fmMonth YYYY') as START_DATE,
+		 TO_CHAR(:P_END_DATE,'DD fmMonth YYYY') as END_DATE,
+		 TO_CHAR(:P_DATE_REQUESTED, 'DD fmMonth YYYY') as DATE_ISSUED
+   FROM DUAL
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_SIG_FULL_NAME">
+<![CDATA[
+
+select UPPER(PPF.FIRST_NAME || ' ' ||  (substr(regexp_substr(PPF.MIDDLE_NAMES,'[^ ]+', 1,1), 1,1)||''||
+         substr(regexp_substr(PPF.MIDDLE_NAMES,'[^ ]+', 1,2), 1,1)||'.') || ' ' || PPF.LAST_NAME ) AS SIG_FULL_NAME
+		from per_people_f ppf, FND_LOOKUP_VALUES fnd
+		where fnd.LOOKUP_CODE = ppf.TITLE
+		 and ppf.person_id = :P_SIGNATORY_PERSON_ID
+		and fnd.ENABLED_FLAG = 'Y'
+		and ppf.BUSINESS_GROUP_ID = 81
+		and fnd.LOOKUP_TYPE = 'UP_HR_TITLE'
+		and :P_START_DATE between ppf.effective_start_date and ppf.effective_end_date
+
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_SIG_DESIGNATION">
+<![CDATA[
+
+select substr(PALD.POSITION,1,instr(PALD.POSITION,'.')-1) SIG_POS
+    from PER_ALL_ASSIGNMENTS_D PALD, PER_ALL_ASSIGNMENTS_F PALF
+               where PALD.ASSIGNMENT_ID = PALF.ASSIGNMENT_ID
+               and PALF.ASSIGNMENT_ID = :P_SIGNATORY_ASSIGNMENT_ID
+               and :P_START_DATE BETWEEN PALD.EFFECTIVE_START_DATE AND PALD.EFFECTIVE_END_DATE
+               and :P_START_DATE BETWEEN PALF.EFFECTIVE_START_DATE and PALF.EFFECTIVE_END_DATE
+			   AND rownum = 1
+]]>
+</sqlStatement>
+
+<sqlStatement name="Q_INPUT">
+<![CDATA[
+   SELECT :P_INPUT_1 INPUT_1
+   FROM DUAL
+]]>
+</sqlStatement>
+
+</dataQuery>
+<dataStructure>
+
+<group name="Q_LEGAL_ENT" source = "Q_LEGAL_ENT">
+<element name="LEGAL_ENTITY" value="LEGAL_ENTITY"/>
+</group>
+
+<group name="Q_UNIT_NAME" source = "Q_UNIT_NAME">
+<element name="EMP_ORG" value="EMP_ORG"/>
+</group>
+
+<group name="Q_LOCATION_ADD" source = "Q_LOCATION_ADD">
+<element name="LOCATION_ADD" value="LOCATION_ADD"/>
+</group>
+
+<group name="Q_SEQUENCE" source="Q_SEQUENCE">
+   <element name="SEQ" value="SEQ"/>
+</group>
+
+<group name="Q_EMP_FULL_NAME" source="Q_EMP_FULL_NAME">
+<element name="EMP_FULL_NAME" value="EMP_FULL_NAME"/>
+</group>
+
+<group name="Q_SIG_FULL_NAME" source="Q_SIG_FULL_NAME">
+<element name="SIG_FULL_NAME" value="SIG_FULL_NAME"/>
+</group>
+
+<group name="Q_SIG_DESIGNATION" source="Q_SIG_DESIGNATION">
+<element name="SIG_POS" value="SIG_POS"/>
+</group>
+
+<group name="Q_CU" source="Q_CU">
+<element name="CU" value="CU"/>
+<element name="CU_Proper" value="CU_Proper"/>
+
+</group>
+
+<group name="Q_DESIGNATION" source="Q_DESIGNATION">
+<element name="EMP_POS" value="EMP_POS"/>
+</group>
+
+<group name="Q_GRADE_STEP" source="Q_GRADE_STEP">
+<element name="SG" value="SG"/>
+</group>
+
+<group name="Q_HON_IN_WORDS" source="Q_HON_IN_WORDS">
+<element name="HON_IN_WORDS" value="HON_IN_WORDS"/>
+</group>
+
+<group name="Q_HON_IN_NUMBERS" source="Q_HON_IN_NUMBERS">
+<element name="HON_IN_NUMBERS" value="HON_IN_NUMBERS"/>
+</group>
+
+<group name="Q_RA_IN_WORDS" source="Q_RA_IN_WORDS">
+<element name="RA_IN_WORDS" value="RA_IN_WORDS"/>
+</group>
+
+<group name="Q_RA_IN_NUMBERS" source="Q_RA_IN_NUMBERS">
+<element name="RA_IN_NUMBERS" value="RA_IN_NUMBERS"/>
+</group>
+
+<group name="Q_TA_IN_WORDS" source="Q_TA_IN_WORDS">
+<element name="TA_IN_WORDS" value="TA_IN_WORDS"/>
+</group>
+
+<group name="Q_TA_IN_NUMBERS" source="Q_TA_IN_NUMBERS">
+<element name="TA_IN_NUMBERS" value="TA_IN_NUMBERS"/>
+</group>
+
+<group name="Q_ADMIN_LOAD_CREDIT" source="Q_ADMIN_LOAD_CREDIT">
+<element name="ADMINLOADCREDIT" value="ADMINLOADCREDIT"/>
+</group>
+
+
+<group name="Q_DATE_REQUESTED" source="Q_DATE_REQUESTED">
+   <element name="START_DATE" value="START_DATE"/>
+   <element name="END_DATE" value="END_DATE"/> 
+   <element name="DATE_ISSUED" value="DATE_ISSUED"/>
+</group>
+
+<group name="Q_INPUT" source="Q_INPUT">
+<element name="INPUT_1" value="INPUT_1"/>
+</group>
+
+
+
+</dataStructure>
+</dataTemplate>
